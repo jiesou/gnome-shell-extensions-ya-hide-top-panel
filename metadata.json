@@ -1,0 +1,10 @@
+{
+  "name": "Yet Another Hide Top Panel",
+  "description": "Hides the top panel bar. But keeps it in overview, with hot corners always available",
+  "uuid": "ya-hide-top-panel@jiesou.github.io",
+  "url": "https://github.com/jiesou/gnome-shell-extensions-ya-hide-top-panel",
+  "shell-version": [
+    "49",
+    "50"
+  ]
+}
