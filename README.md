@@ -8,6 +8,7 @@ Basically the same as `Panel Visibility OFF` + `Panel Visibility in Overview ON`
 
 - [sonersg/Hide Topbar](https://extensions.gnome.org/extension/9031/hide-topbar) flickers when entering overview.
 - [tuxor1337/Hide Top Bar](https://extensions.gnome.org/extension/545/hide-top-bar) makes hot corners feel weird and harder to trigger.
+- [jrahmatzadeh/Just Perfection](https://extensions.gnome.org/extension/3843/just-perfection) flickers after unlocking shell.
 
 ## Credits
 

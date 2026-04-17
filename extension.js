@@ -21,22 +21,41 @@ import St from 'gi://St';
 
 export default class YaHideTopbarExtension extends Extension {
     enable() {
-        // TKS: https://gitlab.gnome.org/jrahmatzadeh/just-perfection/-/blob/main/src/lib/API.js#L425
         const panelBox = Main.layoutManager.panelBox;
 
-        if (panelBox.get_parent() === Main.layoutManager.uiGroup) {
-            Main.layoutManager.removeChrome(panelBox);
-            Main.layoutManager.overviewGroup.insert_child_at_index(panelBox, 0);
+        if (Main.sessionMode.isLocked || Main.sessionMode.currentMode === 'unlock-dialog') {
+            if (panelBox.get_parent() === Main.layoutManager.overviewGroup)
+                Main.layoutManager.overviewGroup.remove_child(panelBox);
+
+            if (panelBox.get_parent() !== Main.layoutManager.uiGroup)
+                Main.layoutManager.uiGroup.add_child(panelBox);
+
+            Main.layoutManager.uiGroup.set_child_above_sibling(
+                panelBox,
+                Main.layoutManager.screenShieldGroup
+            );
+        } else {
+            // TKS: https://gitlab.gnome.org/jrahmatzadeh/just-perfection/-/blob/main/src/lib/API.js#L425
+            if (panelBox.get_parent() === Main.layoutManager.uiGroup)
+                Main.layoutManager.removeChrome(panelBox);
+
+            if (panelBox.get_parent() !== Main.layoutManager.overviewGroup)
+                Main.layoutManager.overviewGroup.insert_child_at_index(panelBox, 0);
         }
+
         panelBox.translation_y = 0;
 
         Main.layoutManager._updateHotCorners();
 
         const searchEntryParent = Main.overview.searchEntry.get_parent();
 
-        const panelHeight = Main.panel.height;
-        const scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        searchEntryParent.set_style(`margin-top: ${Math.round(panelHeight / scaleFactor)}px;`);
+        if (Main.sessionMode.isLocked || Main.sessionMode.currentMode === 'unlock-dialog')
+            searchEntryParent.set_style(`margin-top: 0;`);
+        else {
+            const panelHeight = Main.panel.height;
+            const scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+            searchEntryParent.set_style(`margin-top: ${Math.round(panelHeight / scaleFactor)}px;`);
+        }
 
         // hide and show can fix windows going under panel
         panelBox.hide();
@@ -61,6 +80,15 @@ export default class YaHideTopbarExtension extends Extension {
                 }
             );
         }
+
+        if (!this._hidePanelSessionModeSignal) {
+            this._hidePanelSessionModeSignal = Main.sessionMode.connect(
+                'updated',
+                () => {
+                    this.enable();
+                }
+            );
+        }
     }
 
     disable() {
@@ -68,11 +96,17 @@ export default class YaHideTopbarExtension extends Extension {
 
         panelBox.translation_y = 0;
 
-        Main.layoutManager.overviewGroup.remove_child(panelBox);
-        Main.layoutManager.addChrome(panelBox, {
-            affectsStruts: true,
-            trackFullscreen: true,
-        });
+        if (panelBox.get_parent() === Main.layoutManager.overviewGroup)
+            Main.layoutManager.overviewGroup.remove_child(panelBox);
+        else if (panelBox.get_parent() === Main.layoutManager.uiGroup)
+            Main.layoutManager.uiGroup.remove_child(panelBox);
+
+        if (panelBox.get_parent() !== Main.layoutManager.uiGroup) {
+            Main.layoutManager.addChrome(panelBox, {
+                affectsStruts: true,
+                trackFullscreen: true,
+            });
+        }
 
         if (this._hidePanelWorkareasChangedSignal) {
             global.display.disconnect(this._hidePanelWorkareasChangedSignal);
@@ -82,6 +116,11 @@ export default class YaHideTopbarExtension extends Extension {
         if (this._hidePanelHeightSignal) {
             panelBox.disconnect(this._hidePanelHeightSignal);
             delete (this._hidePanelHeightSignal);
+        }
+
+        if (this._hidePanelSessionModeSignal) {
+            Main.sessionMode.disconnect(this._hidePanelSessionModeSignal);
+            delete (this._hidePanelSessionModeSignal);
         }
 
         const searchEntryParent = Main.overview.searchEntry.get_parent();
