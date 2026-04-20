@@ -99,7 +99,7 @@ export default class YaHideTopbarExtension extends Extension {
         if (panelBox.get_parent() === Main.layoutManager.overviewGroup)
             Main.layoutManager.overviewGroup.remove_child(panelBox);
         else if (panelBox.get_parent() === Main.layoutManager.uiGroup)
-            Main.layoutManager.uiGroup.remove_child(panelBox);
+            Main.layoutManager.removeChrome(panelBox);
 
         if (panelBox.get_parent() !== Main.layoutManager.uiGroup) {
             Main.layoutManager.addChrome(panelBox, {
