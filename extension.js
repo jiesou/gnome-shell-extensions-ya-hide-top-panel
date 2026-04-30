@@ -92,6 +92,8 @@ export default class YaHideTopbarExtension extends Extension {
     }
 
     disable() {
+        // unlock-dialog is required so the panel won't flickers after unlocking shell
+        // see: https://github.com/jiesou/gnome-shell-extensions-ya-hide-top-panel/commit/1a6adf5abb47e4633153f9f99dbf82e4338e0604
         const panelBox = Main.layoutManager.panelBox;
 
         panelBox.translation_y = 0;
