@@ -18,9 +18,10 @@
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import St from 'gi://St';
+import Meta from 'gi://Meta';
 
 export default class YaHideTopbarExtension extends Extension {
-    enable() {
+    _applyLayout() {
         const panelBox = Main.layoutManager.panelBox;
 
         if (Main.sessionMode.isLocked || Main.sessionMode.currentMode === 'unlock-dialog') {
@@ -47,19 +48,32 @@ export default class YaHideTopbarExtension extends Extension {
 
         Main.layoutManager._updateHotCorners();
 
-        const searchEntryParent = Main.overview.searchEntry.get_parent();
+        const searchEntry = Main.overview.searchEntry;
 
-        if (Main.sessionMode.isLocked || Main.sessionMode.currentMode === 'unlock-dialog')
-            searchEntryParent.set_style(`margin-top: 0;`);
-        else {
+        if (Main.sessionMode.isLocked || Main.sessionMode.currentMode === 'unlock-dialog') {
+            searchEntry.set_style(`margin-top: 0;`);
+        } else {
             const panelHeight = Main.panel.height;
             const scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-            searchEntryParent.set_style(`margin-top: ${Math.round(panelHeight / scaleFactor)}px;`);
+            // Apply margin-top on the St.Entry itself, not on its parent Bin.
+            // Dash to Dock's ControlsManagerLayout.allocate vfunc injection re-allocates
+            // the searchEntry *parent* (St.Bin) horizontally when the dock is on LEFT/RIGHT
+            // with `dockFixed=true`, preserving the Bin's y1. If the margin-top lives on the
+            // Bin, its get_preferred_height gets inflated, which feeds back into searchHeight
+            // used by the upstream allocate for subsequent boxes (dash, thumbnails, search
+            // controller), cascading mis-sizing when the dock reserves horizontal strut space.
+            // Keeping the margin on the leaf Entry avoids inflating the Bin's preferred height
+            // while still visually pushing the entry content below the panel.
+            searchEntry.set_style(`margin-top: ${Math.round(panelHeight / scaleFactor)}px;`);
         }
 
         // hide and show can fix windows going under panel
         panelBox.hide();
         panelBox.show();
+    }
+
+    enable() {
+        this._applyLayout();
 
         if (this._hidePanelWorkareasChangedSignal) {
             global.display.disconnect(this._hidePanelWorkareasChangedSignal);
@@ -67,34 +81,43 @@ export default class YaHideTopbarExtension extends Extension {
         }
         this._hidePanelWorkareasChangedSignal = global.display.connect(
             'workareas-changed',
-            () => {
-                this.enable();
-            }
+            () => this._scheduleApply()
         );
 
         if (!this._hidePanelHeightSignal) {
-            this._hidePanelHeightSignal = panelBox.connect(
+            this._hidePanelHeightSignal = Main.layoutManager.panelBox.connect(
                 'notify::height',
-                () => {
-                    this.enable();
-                }
+                () => this._scheduleApply()
             );
         }
 
         if (!this._hidePanelSessionModeSignal) {
             this._hidePanelSessionModeSignal = Main.sessionMode.connect(
                 'updated',
-                () => {
-                    this.enable();
-                }
+                () => this._scheduleApply()
             );
         }
+    }
+
+    _scheduleApply() {
+        if (this._applyLaterId)
+            return;
+        this._applyLaterId = Meta.later_add(Meta.LaterType.BEFORE_REDRAW, () => {
+            this._applyLaterId = 0;
+            this._applyLayout();
+            return false;
+        });
     }
 
     disable() {
         // unlock-dialog is required so the panel won't flickers after unlocking shell
         // see: https://github.com/jiesou/gnome-shell-extensions-ya-hide-top-panel/commit/1a6adf5abb47e4633153f9f99dbf82e4338e0604
         const panelBox = Main.layoutManager.panelBox;
+
+        if (this._applyLaterId) {
+            Meta.later_remove(this._applyLaterId);
+            this._applyLaterId = 0;
+        }
 
         panelBox.translation_y = 0;
 
@@ -125,8 +148,7 @@ export default class YaHideTopbarExtension extends Extension {
             delete (this._hidePanelSessionModeSignal);
         }
 
-        const searchEntryParent = Main.overview.searchEntry.get_parent();
-        searchEntryParent.set_style(`margin-top: 0;`);
+        Main.overview.searchEntry.set_style(`margin-top: 0;`);
 
         // hide and show can fix windows going under panel
         panelBox.hide();
