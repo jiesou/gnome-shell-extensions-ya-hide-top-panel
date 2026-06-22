@@ -94,7 +94,7 @@ export default class YaHideTopbarExtension extends Extension {
         if (!this._hidePanelSessionModeSignal) {
             this._hidePanelSessionModeSignal = Main.sessionMode.connect(
                 'updated',
-                () => this._scheduleApply()
+                () => this._applyLayout()
             );
         }
     }
