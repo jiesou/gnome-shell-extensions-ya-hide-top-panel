@@ -99,10 +99,25 @@ export default class YaHideTopbarExtension extends Extension {
         }
     }
 
+    _laterAdd(callback) {
+        // Meta.later_add was removed in mutter 46; use the current API with a
+        // fallback for older versions.
+        if (global.compositor.get_laters)
+            return global.compositor.get_laters().add(Meta.LaterType.BEFORE_REDRAW, callback);
+        return Meta.later_add(Meta.LaterType.BEFORE_REDRAW, callback);
+    }
+
+    _laterRemove(id) {
+        if (global.compositor.get_laters)
+            global.compositor.get_laters().remove(id);
+        else
+            Meta.later_remove(id);
+    }
+
     _scheduleApply() {
         if (this._applyLaterId)
             return;
-        this._applyLaterId = Meta.later_add(Meta.LaterType.BEFORE_REDRAW, () => {
+        this._applyLaterId = this._laterAdd(() => {
             this._applyLaterId = 0;
             this._applyLayout();
             return false;
@@ -115,7 +130,7 @@ export default class YaHideTopbarExtension extends Extension {
         const panelBox = Main.layoutManager.panelBox;
 
         if (this._applyLaterId) {
-            Meta.later_remove(this._applyLaterId);
+            this._laterRemove(this._applyLaterId);
             this._applyLaterId = 0;
         }
 
